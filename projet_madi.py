@@ -5,20 +5,31 @@ import pydotplus as dot
 class FactorGraph(gum.UndiGraph):
 
     def __init__(self):
+        # init super classe
         gum.UndiGraph.__init__(self);
+        # dictionnaire pour stocker le type de chaque noeud   { int node_id : str node_type }
         self.node_type = dict();
+        # dictionnaire pour stocker le contenu d'un noeud:  
+        # gum.DiscreteVariable si le noeud est de type variable, et gum.Potential si de type factor
         self.node = dict();
+        # init
         self.bn = None
 
     def addVariable(self,v):
+        # créer un noeud
         node_id = self.addNode();
+        # stocker le type du noeud dans un dictionaire
         self.node_type[node_id] = "variable";
+        # stoker le contenu du noeud
         self.node[node_id] = v;
         # self.node[node_id].setName(str(node_id))
         return node_id;
     def addFactor(self,p):
+        # créer un noeud
         node_id = self.addNode();
+        # stocker le type du noeud
         self.node_type[node_id] = "factor";
+        #  stocker le contenu du noeud
         self.node[node_id] = p;
         # self.node[node_id].setName(str(node_id))
         return node_id
@@ -35,13 +46,16 @@ class FactorGraph(gum.UndiGraph):
         # ajout des node_factors
         for node_id in self.bn.nodes():
             node_id_factor = self.addFactor(self.bn.cpt(node_id));
+            # trouver tous les noeuds qui sont parents du noeud dans bn
             parents_id = self.bn.parents(node_id);
+            # ajout et supprime des arêtes
             for node_id2 in parents_id:
                 self.eraseEdge(node_id2, node_id);
                 self.addEdge(node_id2,node_id_factor);
             self.addEdge(node_id_factor, node_id);
         
     def show(self):
+        #  produit une chqine de caractère pour afficher le graphe au format DOT 
         st = "graph FG {\n layout=neato; \n \n node [shape=rectangle,margin=0.04, \n width=0,height=0, style=filled,color=\"coral\"]\n \n"
         for node_id in self.nodes():
             if self.node_type[node_id] == "variable":
@@ -66,9 +80,11 @@ class TreeSumProductInference:
             '''
             pour un arbre
             '''
-            print("cycle ",fg.hasUndirectedCycle())
+            # cette methode d'inference fonctionne seulement pour les arebres
             assert not(fg.hasUndirectedCycle())
-            nodes = list(fg.nodes());
+            # trouver un ordre pour l'envoie des messages
+            # par les noeuds de degree croissante
+            nodes = list(fg.nodes());  
             nb_voisins = [len(fg.neighbours(node)) for node in nodes]
             print(nb_voisins);
             ordre = [];
@@ -85,19 +101,19 @@ class TreeSumProductInference:
                         for j in range(len(nodes)):
                             if fg.existsEdge(nodes[i],nodes[j]):
                                 nb_voisins[j] -= 1;
-                        print(nb_voisins)
-                        print("ordre ",ordre)
             return ordre;
+        
         self.fg = fg;
+        # fixer un ordre pour l'envoie des messages
         self.order = ordre(fg)
-        # cpt received for every node
-        self.dict_dict_cpt = dict();
+        # cpt received for every node:    { node1 : { node2 : cpt }  } pour node1 received cpt from node2  
+        self.dict_dict_cpt = dict(); 
         for node_id in self.fg.nodes():
             self.dict_dict_cpt[node_id] = dict();
             for node_id2 in self.fg.neighbours(node_id):
                 self.dict_dict_cpt[node_id][node_id2] = None;
 
-        # root 
+        # root de l'arbre
         self.root_id = self.order[-1];
     
     def nodeMessage(self,node_id):            
@@ -106,7 +122,7 @@ class TreeSumProductInference:
             # si on l'a deja envoye un message
             if self.dict_dict_cpt[node_id2][node_id] != None:
                 continue;
-            # init message
+            # message est en fait cpt a envoyer
             message = 1;
             # pour tous les voisins sauf node_id2
             flag = True
@@ -114,11 +130,11 @@ class TreeSumProductInference:
                 # si c'est node_id2
                 if node_id2 == node_id3:
                     continue;
-                # MAJ message
+                # si node_id ne peut pas envoyer de message a node2, i.e. il mqnaue un message d'un noeud node_id3
                 if self.dict_dict_cpt[node_id][node_id3] == None:
                     flag = False
                     break;
-                    print("id2 = {} dict_dict_cpt[{}][{}] = None".format(node_id2,node_id,node_id3))
+                # si node_id3 est un neoud_variable feuille, alors on n'a pas besoin de MAJ le message
                 if message == 1:
                     message = self.dict_dict_cpt[node_id][node_id3]
                 else:
@@ -142,7 +158,7 @@ class TreeSumProductInference:
                 # si c'est node_id2
                 if node_id2 == node_id3:
                     continue;
-                # MAJ message
+                # si node_id ne peut pas envoyer de message a node2, i.e. il mqnaue un message d'un noeud node_id3
                 if self.dict_dict_cpt[node_id][node_id3] == 1:
                     continue;
                 else:
@@ -160,14 +176,15 @@ class TreeSumProductInference:
             self.dict_dict_cpt[node_id2][node_id] = message;
     
     def makeInference(self):
+        # message vers la racine
         for node_id in self.order:
-            # if it's a node
+            # si le noeud est de type "variable"
             if self.fg.node_type[node_id] == "variable":
                 self.nodeMessage(node_id);
-            # if it's a factor
+            # si le noeud est de type "factor"
             if self.fg.node_type[node_id] == "factor":
                 self.factorMessage(node_id);
-        
+        # message vers les feuilles
         for node_id in reversed(self.order):
             # if it's a node
             if self.fg.node_type[node_id] == "variable":
@@ -180,13 +197,14 @@ class TreeSumProductInference:
         #variable.setName(str)
     def posterior(self,node_id):
         assert self.fg.node_type[node_id] == "variable"
+        # calculer la probabilite jointe
         cpt = None
         for cpt2 in self.dict_dict_cpt[node_id].values():
             if cpt == None:
                 cpt = cpt2;
             else:
                 cpt = cpt * cpt2;
-        # sum
+        # calculer la probabilite marginale
         for name in cpt.var_names:
             if self.fg.node[node_id].name() != name:
                 cpt = cpt.margSumOut(name);
