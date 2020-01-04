@@ -406,8 +406,8 @@ class LBPSumProductInference:
         # un node message pour chaque voisin
         for node_id2 in self.fg.neighbours(node_id):
             # si on l'a deja envoye un message
-            if self.dict_dict_cpt[node_id2][node_id] != None:
-                continue;
+            # if self.dict_dict_cpt[node_id2][node_id] != None:
+            #     continue;
             # message est en fait cpt a envoyer
             message = 1;
             # pour tous les voisins sauf node_id2
@@ -438,8 +438,8 @@ class LBPSumProductInference:
         # un factor message pour chaque voisin 
         for node_id2 in self.fg.neighbours(node_id):
             # si on l'a deja envoye un message
-            if self.dict_dict_cpt[node_id2][node_id] != None:
-                continue;
+            # if self.dict_dict_cpt[node_id2][node_id] != None:
+            #     continue;
             # init message
             message = self.fg.node[node_id];
             # pour tous les voisins sauf node_id2
