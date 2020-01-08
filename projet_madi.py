@@ -1,6 +1,4 @@
-import copy
 import pyAgrum as gum
-import pydotplus as dot
 
 class FactorGraph(gum.UndiGraph):
 
@@ -14,6 +12,11 @@ class FactorGraph(gum.UndiGraph):
         self.node = dict();
         # init
         self.bn = None
+    
+    def copy(self):
+        fg = FactorGraph();
+        fg.build(self.bn);
+        return fg;
 
     def addVariable(self,v):
         # créer un noeud
@@ -59,7 +62,7 @@ class FactorGraph(gum.UndiGraph):
         st = "graph FG {\n layout=neato; \n \n node [shape=rectangle,margin=0.04, \n width=0,height=0, style=filled,color=\"coral\"]\n \n"
         for node_id in self.nodes():
             if self.node_type[node_id] == "variable":
-                st += (str(node_id) + ";");
+                st += (self.node[node_id].name() + ";");
         st += "\n\n     node [shape=point,width=0.1,height=0.1, style=filled,color=\"burlywood\"];\n"
                 
         for node_id in self.nodes():
@@ -69,50 +72,22 @@ class FactorGraph(gum.UndiGraph):
         st += "edge [len=0.7];\n";
         for edge in self.edges():
             u,v = edge;
-            st += str(u) + "--" + str(v) + "\n";
+            st += self.node[u].name() + "--" + str(v) + "\n";
         st += "}"
         return st
+    def addEvidence(self,evidence):
+        print(evidence);
 
 
 class TreeSumProductInference:
     def __init__(self,fg):
-        def ordre(fg):
-            '''
-            pour un arbre
-            '''
-            # cette methode d'inference fonctionne seulement pour les arebres
-            assert not(fg.hasUndirectedCycle())
-            # trouver un ordre pour l'envoie des messages
-            # par les noeuds de degree croissante
-            nodes = list(fg.nodes());  
-            nb_voisins = [len(fg.neighbours(node)) for node in nodes]
-            ordre = [];
-            while len(ordre) < len(nodes):
-                if len(ordre) == len(nodes)-1:
-                    for i in range(len(nodes)):
-                        if nodes[i] not in ordre:
-                            ordre.append(nodes[i])
-                for i in range(len(nodes)):
-                    if nb_voisins[i] == 1:
-                        ordre.append(nodes[i]);
-                        nb_voisins[i] = 0;
-                        for j in range(len(nodes)):
-                            if fg.existsEdge(nodes[i],nodes[j]):
-                                nb_voisins[j] -= 1;
-            return ordre;
-        
-        self.fg = fg;
+        self.fg = fg.copy();
         # fixer un ordre pour l'envoie des messages
-        self.order = ordre(fg)
+        self.order = None
         # cpt received for every node:    { node1 : { node2 : cpt }  } pour node1 received cpt from node2  
         self.dict_dict_cpt = dict(); 
-        for node_id in self.fg.nodes():
-            self.dict_dict_cpt[node_id] = dict();
-            for node_id2 in self.fg.neighbours(node_id):
-                self.dict_dict_cpt[node_id][node_id2] = None;
-
         # root de l'arbre
-        self.root_id = self.order[-1];
+        self.root_id = None
     
     def nodeMessage(self,node_id):            
         # un node message pour chaque voisin
@@ -175,6 +150,41 @@ class TreeSumProductInference:
             self.dict_dict_cpt[node_id2][node_id] = message;
     
     def makeInference(self):
+        def ordre(fg):
+            '''
+            pour un arbre
+            '''
+            # cette methode d'inference fonctionne seulement pour les arebres
+            assert not(fg.hasUndirectedCycle())
+            # trouver un ordre pour l'envoie des messages
+            # par les noeuds de degree croissante
+            nodes = list(fg.nodes());  
+            nb_voisins = [len(fg.neighbours(node)) for node in nodes]
+            ordre = [];
+            while len(ordre) < len(nodes):
+                if len(ordre) == len(nodes)-1:
+                    for i in range(len(nodes)):
+                        if nodes[i] not in ordre:
+                            ordre.append(nodes[i])
+                for i in range(len(nodes)):
+                    if nb_voisins[i] == 1:
+                        ordre.append(nodes[i]);
+                        nb_voisins[i] = 0;
+                        for j in range(len(nodes)):
+                            if fg.existsEdge(nodes[i],nodes[j]):
+                                nb_voisins[j] -= 1;
+            return ordre;
+        
+        self.order = ordre(self.fg)
+        # cpt received for every node:    { node1 : { node2 : cpt }  } pour node1 received cpt from node2  
+        for node_id in self.fg.nodes():
+            self.dict_dict_cpt[node_id] = dict();
+            for node_id2 in self.fg.neighbours(node_id):
+                self.dict_dict_cpt[node_id][node_id2] = None;
+
+        # root de l'arbre
+        self.root_id = self.order[-1];
+        
         # message vers la racine
         for node_id in self.order:
             # si le noeud est de type "variable"
@@ -208,242 +218,68 @@ class TreeSumProductInference:
             if self.fg.node[node_id].name() != name:
                 cpt = cpt.margSumOut(name);
         
-        return cpt;
-        
-        
-# class LBPSumProductInference:
-#     def __init__(self,fg):
-#         # def ordre(fg):
-#         #     '''
-#         #     pour un arbre
-#         #     '''
-#         #     # cette methode d'inference fonctionne seulement pour les arebres
-#         #     assert not(fg.hasUndirectedCycle())
-#         #     # trouver un ordre pour l'envoie des messages
-#         #     # par les noeuds de degree croissante
-#         #     nodes = list(fg.nodes());  
-#         #     nb_voisins = [len(fg.neighbours(node)) for node in nodes]
-#         #     ordre = [];
-#         #     while len(ordre) < len(nodes):
-#         #         if len(ordre) == len(nodes)-1:
-#         #             for i in range(len(nodes)):
-#         #                 if nodes[i] not in ordre:
-#         #                     ordre.append(nodes[i])
-#         #         for i in range(len(nodes)):
-#         #             if nb_voisins[i] == 1:
-#         #                 ordre.append(nodes[i]);
-#         #                 nb_voisins[i] = 0;
-#         #                 for j in range(len(nodes)):
-#         #                     if fg.existsEdge(nodes[i],nodes[j]):
-#         #                         nb_voisins[j] -= 1;
-#         #     return ordre;
-        
-#         self.fg = fg;
-#         # fixer un ordre pour l'envoie des messages
-#         self.order = self.fg.nodes();
-#         # cpt received for every node:    { node1 : { node2 : cpt }  } pour node1 received cpt from node2  
-#         self.dict_dict_cpt = dict(); 
-#         for node_id in self.fg.nodes():
-#             self.dict_dict_cpt[node_id] = dict();
-#             for node_id2 in self.fg.neighbours(node_id):
-#                 if self.fg.node_type[node_id2] == "variable":
-#                     self.dict_dict_cpt[node_id][node_id2] = 1;
-#                 if self.fg.node_type[node_id2] == "factor":
-#                     self.dict_dict_cpt[node_id][node_id2] = self.fg.node[node_id2];
-
-#         # root de l'arbre
-#         # self.root_id = self.order[-1];
+        return cpt.normalize();
     
-#     def nodeMessage(self,node_id) -> bool:            
-#         # un node message pour chaque voisin
-#         for node_id2 in self.fg.neighbours(node_id):
-#             # si on l'a deja envoye un message
-#             # if self.dict_dict_cpt[node_id2][node_id] != None:
-#             #     continue;
-#             # message est en fait cpt a envoyer
-#             message = 1;
-#             # pour tous les voisins sauf node_id2
-#             # flag = True
-#             for node_id3 in self.fg.neighbours(node_id):
-#                 # si c'est node_id2
-#                 if node_id2 == node_id3:
-#                     continue;
-#                 # si node_id ne peut pas envoyer de message a node2, i.e. il mqnaue un message d'un noeud node_id3
-#                 # if self.dict_dict_cpt[node_id][node_id3] == None:
-#                 #     flag = False
-#                 #     break;
-                    
-#                 # si node_id3 est un neoud_variable feuille, alors on n'a pas besoin de MAJ le message
-#                 if message == 1:
-#                     message = self.dict_dict_cpt[node_id][node_id3]
-#                 else:
-#                     message = message * self.dict_dict_cpt[node_id][node_id3];
-#             # if not(flag):
-#             #     continue;
-#             # envoie de message
-#             if self.dict_dict_cpt[node_id2][node_id] != message:
-#                 self.dict_dict_cpt[node_id2][node_id] = message;
-#                 return True;
-#             else:
-#                 return False;
-#     def factorMessage(self,node_id) -> bool:
-#         # un factor message pour chaque voisin 
-#         for node_id2 in self.fg.neighbours(node_id):
-#             # si on l'a deja envoye un message
-#             # if self.dict_dict_cpt[node_id2][node_id] != None:
-#             #     continue;
-#             # init message
-#             message = self.fg.node[node_id];
-#             # pour tous les voisins sauf node_id2
-#             # flag = True
-#             for node_id3 in self.fg.neighbours(node_id):
-#                 # si c'est node_id2
-#                 if node_id2 == node_id3:
-#                     continue;
-#                 # si node_id ne peut pas envoyer de message a node2, i.e. il mqnaue un message d'un noeud node_id3
-#                 if self.dict_dict_cpt[node_id][node_id3] == 1:
-#                     continue;
-#                 else:
-#                 #     if self.dict_dict_cpt[node_id][node_id3] == None:
-#                 #         flag = False
-#                 #         break;
-#                     message = message * self.dict_dict_cpt[node_id][node_id3];
-#             # if not(flag):
-#             #     continue;
-#             for name in message.var_names:
-#                 if name != self.fg.node[node_id2].name():
-#                     message = message.margSumOut(name);
-#             # envoie de message
-#             if self.dict_dict_cpt[node_id2][node_id] != message:
-#                 self.dict_dict_cpt[node_id2][node_id] = message;
-#                 return True;
-#             else:
-#                 return False;
-
-#     def makeInference(self):
-        
-#         # message vers la racine
-#         flag = True;
-#         while flag:
-#             flag = False;
-#             for node_id in self.order:
-#                 # si le noeud est de type "variable"
-#                 if self.fg.node_type[node_id] == "variable":
-#                     flag = flag or self.nodeMessage(node_id);
-#                 # si le noeud est de type "factor"
-#                 if self.fg.node_type[node_id] == "factor":
-#                     flag = flag or self.factorMessage(node_id);
-#         # message vers les feuilles
-#         # for node_id in reversed(self.order):
-#         #     # if it's a node
-#         #     if self.fg.node_type[node_id] == "variable":
-#         #         self.nodeMessage(node_id);
-#         #     # if it's a factor
-#         #     if self.fg.node_type[node_id] == "factor":
-#         #         self.factorMessage(node_id);
-        
-#         #variable.name()
-#         #variable.setName(str)
-#     def posterior(self,node_id):
-#         assert self.fg.node_type[node_id] == "variable"
-#         # calculer la probabilite jointe
-#         cpt = None
-#         for cpt2 in self.dict_dict_cpt[node_id].values():
-#             if cpt == None:
-#                 cpt = cpt2;
-#             else:
-#                 cpt = cpt * cpt2;
-#         # calculer la probabilite marginale
-#         for name in cpt.var_names:
-#             if self.fg.node[node_id].name() != name:
-#                 cpt = cpt.margSumOut(name);
-        
-#         return cpt;
-        
+    def addEvidence(self,evidence):
+        for name,label in evidence.items():
+            # print("name {} label {}".format(name,label));
+            for node_id in self.fg.nodes():
+                if self.fg.node_type[node_id] == "factor":
+                    continue;
+                if self.fg.node[node_id].name() != name:
+                    continue;
+                
+                # print("dingdingding node_id= {}  name = {}  ".format(node_id,self.fg.node[node_id].name())) 
+                cpt = gum.Potential().add(self.fg.node[node_id]);
+                cpt.fillWith(0);
+                cpt[label] = 1;
+                node_id_factor = self.fg.addFactor(cpt);
+                self.fg.addEdge(node_id ,node_id_factor)
+                
+                break;
+    
     
 class LBPSumProductInference:
     def __init__(self,fg):
         def ordre(fg):
-            # '''
-            # pour un arbre
-            # '''
-            # # cette methode d'inference fonctionne seulement pour les arebres
-            # assert not(fg.hasUndirectedCycle())
-            # # trouver un ordre pour l'envoie des messages
-            # # par les noeuds de degree croissante
-            # nodes = list(fg.nodes());  
-            # nb_voisins = [len(fg.neighbours(node)) for node in nodes]
-            # ordre = [];
-            # while len(ordre) < len(nodes):
-            #     if len(ordre) == len(nodes)-1:
-            #         for i in range(len(nodes)):
-            #             if nodes[i] not in ordre:
-            #                 ordre.append(nodes[i])
-            #     for i in range(len(nodes)):
-            #         if nb_voisins[i] == 1:
-            #             ordre.append(nodes[i]);
-            #             nb_voisins[i] = 0;
-            #             for j in range(len(nodes)):
-            #                 if fg.existsEdge(nodes[i],nodes[j]):
-            #                     nb_voisins[j] -= 1;
-            # return ordre;
             return list(fg.nodes());
         
-        self.fg = fg;
+        self.fg = fg.copy();
         # fixer un ordre pour l'envoie des messages
-        self.order = ordre(fg)
+        self.order = ordre(self.fg)
         # cpt received for every node:    { node1 : { node2 : cpt }  } pour node1 received cpt from node2  
         self.dict_dict_cpt = dict(); 
-        for node_id in self.fg.nodes():
-            self.dict_dict_cpt[node_id] = dict();
-            for node_id2 in self.fg.neighbours(node_id):
-                self.dict_dict_cpt[node_id][node_id2] = None;
-
-        # root de l'arbre
-        self.root_id = self.order[-1];
-    
-    def nodeMessage(self,node_id):            
-        # un node message pour chaque voisin
+            
+    def nodeMessage(self,node_id):           
+        flag = False;
+         # un node message pour chaque voisin
         for node_id2 in self.fg.neighbours(node_id):
-            # si on l'a deja envoye un message
-            # if self.dict_dict_cpt[node_id2][node_id] != None:
-            #     continue;
-            # message est en fait cpt a envoyer
             message = 1;
             # pour tous les voisins sauf node_id2
-            # flag = True
             for node_id3 in self.fg.neighbours(node_id):
                 # si c'est node_id2
                 if node_id2 == node_id3:
                     continue;
-                # si node_id ne peut pas envoyer de message a node2, i.e. il mqnaue un message d'un noeud node_id3
-                # if self.dict_dict_cpt[node_id][node_id3] == None:
-                #     flag = False
-                #     break;
-                # si node_id3 est un neoud_variable feuille, alors on n'a pas besoin de MAJ le message
+                
+                if self.dict_dict_cpt[node_id][node_id3] == 1:
+                    continue;
                 if message == 1:
-                    message = self.dict_dict_cpt[node_id][node_id3]
+                    message = self.dict_dict_cpt[node_id][node_id3];
                 else:
                     message = message * self.dict_dict_cpt[node_id][node_id3];
-            # if not(flag):
-                # continue;
+       
             # envoie de message
-            if self.dict_dict_cpt[node_id2][node_id] == message:
-                return False;
-            else:
+            if self.dict_dict_cpt[node_id2][node_id] != message:
+                flag = True;
                 self.dict_dict_cpt[node_id2][node_id] = message;
-                return True
+        return flag
             
     def factorMessage(self,node_id):
+        flag = False;
         # un factor message pour chaque voisin 
         for node_id2 in self.fg.neighbours(node_id):
-            # si on l'a deja envoye un message
-            # if self.dict_dict_cpt[node_id2][node_id] != None:
-            #     continue;
-            # init message
             message = self.fg.node[node_id];
             # pour tous les voisins sauf node_id2
-            # flag = True
             for node_id3 in self.fg.neighbours(node_id):
                 # si c'est node_id2
                 if node_id2 == node_id3:
@@ -451,25 +287,18 @@ class LBPSumProductInference:
                 # si node_id ne peut pas envoyer de message a node2, i.e. il mqnaue un message d'un noeud node_id3
                 if self.dict_dict_cpt[node_id][node_id3] == 1:
                     continue;
-                else:
-                    # if self.dict_dict_cpt[node_id][node_id3] == None:
-                        # flag = False
-                        # break;
-                        # print("id2 = {} dict_dict_cpt[{}][{}] = None".format(node_id2,node_id,node_id3))
-                    message = message * self.dict_dict_cpt[node_id][node_id3];
-            # if not(flag):
-                # continue;
+                message = message * self.dict_dict_cpt[node_id][node_id3];
+
             for name in message.var_names:
                 if name != self.fg.node[node_id2].name():
                     message = message.margSumOut(name);
             # envoie de message
-            if self.dict_dict_cpt[node_id2][node_id] == message:
-                return False;
-            else:
+            if self.dict_dict_cpt[node_id2][node_id] != message:
+                flag = True;
                 self.dict_dict_cpt[node_id2][node_id] = message;
-                return True
+        return flag;
     
-    def makeInference(self):
+    def makeInference(self):        
         
         for node_id in self.fg.nodes():
             self.dict_dict_cpt[node_id] = dict();
@@ -477,31 +306,20 @@ class LBPSumProductInference:
                 if self.fg.node_type[node_id2] == "variable":
                     self.dict_dict_cpt[node_id][node_id2] = 1;
                 if self.fg.node_type[node_id2] == "factor":
-                    self.dict_dict_cpt[node_id][node_id2] = self.fg.node[node_id2];
+                    self.dict_dict_cpt[node_id][node_id2] = 1;
                     
         flag = True;
         while flag:
             flag = False;
             # message vers la racine
-            for node_id in self.order:
+            for node_id in self.fg.nodes():
                 # si le noeud est de type "variable"
                 if self.fg.node_type[node_id] == "variable":
                     flag = flag or self.nodeMessage(node_id);
                 # si le noeud est de type "factor"
                 if self.fg.node_type[node_id] == "factor":
                     flag = flag or self.factorMessage(node_id);
-            # message vers les feuilles
-            # for node_id in reversed(self.order):
-            #     # if it's a node
-            #     if self.fg.node_type[node_id] == "variable":
-            #         flag = flag or self.nodeMessage(node_id);
-            #     # if it's a factor
-            #     if self.fg.node_type[node_id] == "factor":
-            #         flag = flag or self.factorMessage(node_id);
-        
-        
-        #variable.name()
-        #variable.setName(str)
+
     def posterior(self,node_id):
         assert self.fg.node_type[node_id] == "variable"
         # calculer la probabilite jointe
@@ -517,6 +335,28 @@ class LBPSumProductInference:
                 cpt = cpt.margSumOut(name);
         
         return cpt.normalize();
+    
+    def addEvidence(self,evidence):
+        for name,label in evidence.items():
+            # print("name {} label {}".format(name,label));
+            for node_id in self.fg.nodes():
+                if self.fg.node_type[node_id] == "factor":
+                    continue;
+                if self.fg.node[node_id].name() != name:
+                    continue;
+                
+                # print("dingdingding node_id= {}  name = {}  ".format(node_id,self.fg.node[node_id].name())) 
+                cpt = gum.Potential().add(self.fg.node[node_id]);
+                cpt.fillWith(0);
+                cpt[label] = 1;
+                node_id_factor = self.fg.addFactor(cpt);
+                self.fg.addEdge(node_id ,node_id_factor)
+                
+                break;
+    
+
+    
+
     
 
         
