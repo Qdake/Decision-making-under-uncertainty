@@ -139,7 +139,7 @@ class TreeSumProductInference:
                     if self.dict_dict_cpt[node_id][node_id3] == None:
                         flag = False
                         break;
-                        print("id2 = {} dict_dict_cpt[{}][{}] = None".format(node_id2,node_id,node_id3))
+                        #print("id2 = {} dict_dict_cpt[{}][{}] = None".format(node_id2,node_id,node_id3))
                     message = message * self.dict_dict_cpt[node_id][node_id3];
             if not(flag):
                 continue;
