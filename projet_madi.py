@@ -216,7 +216,14 @@ class TreeSumProductInference:
         cpt = cpt.margSumIn(self.fg.node[node_id].name())
 
         return cpt.normalize();
-    
+    def argmax(self):
+        res = dict();
+        for node_id in self.fg.nodes():
+            if self.fg.node_type[node_id] == "variable":
+                re = self.posterior(node_id).argmax()[0];
+                for key,value in re.items():
+                    res[key] = value;
+        return res;
     def addEvidence(self,evidence):
         for name,label in evidence.items():
             # print("name {} label {}".format(name,label));
@@ -332,7 +339,14 @@ class LBPSumProductInference:
         cpt = cpt.margSumIn(self.fg.node[node_id].name())
 
         return cpt.normalize();
-    
+    def argmax(self):
+        res = dict();
+        for node_id in self.fg.nodes():
+            if self.fg.node_type[node_id] == "variable":
+                re = self.posterior(node_id).argmax()[0];
+                for key,value in re.items():
+                    res[key] = value;
+        return res;    
     def addEvidence(self,evidence):
         for name,label in evidence.items():
             # print("name {} label {}".format(name,label));
@@ -370,7 +384,9 @@ class TreeMaxProductInference:
             if self.dict_dict_cpt[node_id2][node_id] != None:
                 continue;
             # message est en fait cpt a envoyer
-            message = 1;
+            message = gum.Potential();
+            message.add(self.fg.node[node_id]);
+            message.fillWith(1);
             # pour tous les voisins sauf node_id2
             flag = True
             for node_id3 in self.fg.neighbours(node_id):
@@ -382,27 +398,11 @@ class TreeMaxProductInference:
                     flag = False
                     break;
                 # si node_id3 est un neoud_variable feuille, alors on n'a pas besoin de MAJ le message
-                if message == 1:
-                    message = self.dict_dict_cpt[node_id][node_id3]
-                    if debug:
-                        print("node {} envoie un message de type **{}** au node_factor {}".format(node_id,type(message),node_id2))
-                else:
-                    #####################  calcul message ################################
-                    message = message * self.dict_dict_cpt[node_id][node_id3];
-                    # m = self.dict_dict_cpt[node_id][node_id3]
 
-                    # cpt1 = gum.Potential()
-                    # cpt1.add(self.fg.node[node_id]);
-                    # name_id = self.fg.node[node_id].name();
+                #####################  calcul message ################################
+                message = message * self.dict_dict_cpt[node_id][node_id3];
 
-                    # cpt1(name_id)[0] = message[0]*m[0];
-                    # cpt1(name_id)[1] = message[1]*m[1];
-
-                    # message = cpt1;
-
-                    # if debug:
-                    #     print("node {} envoie un message de type **{}** au node_factor {}".format(name_id,type(message),node_id2))
-                    ######################################################################
+                ######################################################################
             if not(flag):
                 continue;
             # envoie de message
@@ -451,7 +451,7 @@ class TreeMaxProductInference:
 
             ###########################################################
             # envoie de message
-            self.dict_dict_cpt[node_id2][node_id] = message;
+            self.dict_dict_cpt[node_id2][node_id] = cpt;
     
     def makeInference(self):
         def ordre(fg):
@@ -513,7 +513,7 @@ class TreeMaxProductInference:
         res = dict();
         for node_id in self.fg.nodes():
             if self.fg.node_type[node_id] == "variable":
-                re = self.posterior(node_id);
+                re = self.posterior(node_id).argmax()[0];
                 for key,value in re.items():
                     res[key] = value;
         return res;
@@ -529,7 +529,7 @@ class TreeMaxProductInference:
         # calculer la probabilite marginale
         cpt = cpt.margSumIn(self.fg.node[node_id].name())
         
-        return cpt.argmax()[0]
+        return cpt
 
     def addEvidence(self,evidence):
         for name,label in evidence.items():
@@ -699,7 +699,7 @@ class LBPMaxProductInference:
         res = dict();
         for node_id in self.fg.nodes():
             if self.fg.node_type[node_id] == "variable":
-                re = self.posterior(node_id);
+                re = self.posterior(node_id).argmax()[0];
                 for key,value in re.items():
                     res[key] = value;
         return res;
@@ -718,7 +718,7 @@ class LBPMaxProductInference:
         #     if self.fg.node[node_id].name() != name:
         #         cpt = cpt.margSumOut(name);
         
-        return cpt.argmax()[0]
+        return cpt
 
     def addEvidence(self,evidence):
         for name,label in evidence.items():
@@ -822,10 +822,11 @@ class TreeMaxSumInference:
                     if debug:
                         print("node_factor {} envoie un message de type **{}** au node_variable {}".format(node_id,type(message),node_id2))
                     #*******************************************************
-                    tmp = gum.Potential(self.fg.node[node_id]);
-                    tmp.fillWith(1);
-                    tmp = tmp * self.dict_dict_cpt[node_id][node_id3];
-                    message = message + tmp;
+                    #tmp = gum.Potential(self.fg.node[node_id]);
+                    #tmp.fillWith(1);
+                    #tmp = tmp * self.dict_dict_cpt[node_id][node_id3];
+                    #message = message + tmp;
+                    message = message + self.dict_dict_cpt[node_id][node_id3];
                     #******************************************************
             if not(flag):
                 continue;
@@ -896,13 +897,27 @@ class TreeMaxSumInference:
         #variable.name()
         #variable.setName(str)
 
+
+
+
     def argmax(self):
         res = dict();
         for node_id in self.fg.nodes():
             if self.fg.node_type[node_id] == "variable":
-                re = self.posterior(node_id);
-                for key,value in re.items():
-                    res[key] = value;
+                cpt = self.posterior(node_id);
+                
+                m = None
+                mlabel = None
+                for label in range(len(self.fg.node[node_id].labels())):
+                    if mlabel == None:
+                        mlabel = label;
+                        m = cpt[label];
+                    else:
+                        if cpt[label] > m:
+                            mlabel = label;
+                            m = cpt[label];                 
+                name = self.fg.node[node_id].name()
+                res[name] = mlabel;
         return res;
     def posterior(self,node_id):
         assert self.fg.node_type[node_id] == "variable"
@@ -912,23 +927,42 @@ class TreeMaxSumInference:
             if cpt == None:
                 cpt = cpt2;
             else:
-                cpt = cpt * cpt2;
+                cpt = cpt + cpt2;
         # calculer la probabilite marginale
         cpt = cpt.margSumIn(self.fg.node[node_id].name())
-        # for name in cpt.var_names:
-        #     if self.fg.node[node_id].name() != name:
-        #         cpt = cpt.margSumOut(name);
-        m = None
-        mlabel = None
-        for label in range(len(self.fg.node[node_id].labels())):
-            if mlabel == None:
-                mlabel = label;
-                m = cpt[label];
-            else:
-                if cpt[label] > m:
-                    mlabel = label;
-                    m = cpt[label];                    
-        return {self.fg.node[node_id].name():mlabel}
+        
+        return cpt
+    # def argmax(self):
+    #     res = dict();
+    #     for node_id in self.fg.nodes():
+    #         if self.fg.node_type[node_id] == "variable":
+    #             re = self.posterior(node_id);
+    #             for key,value in re.items():
+    #                 res[key] = value;
+    #     return res;
+    # def posterior(self,node_id):
+    #     assert self.fg.node_type[node_id] == "variable"
+    #     # calculer la probabilite jointe
+    #     cpt = None
+    #     for cpt2 in self.dict_dict_cpt[node_id].values():
+    #         if cpt == None:
+    #             cpt = cpt2;
+    #         else:
+    #             cpt = cpt * cpt2;
+    #     # calculer la probabilite marginale
+    #     cpt = cpt.margSumIn(self.fg.node[node_id].name())
+
+    #     m = None
+    #     mlabel = None
+    #     for label in range(len(self.fg.node[node_id].labels())):
+    #         if mlabel == None:
+    #             mlabel = label;
+    #             m = cpt[label];
+    #         else:
+    #             if cpt[label] > m:
+    #                 mlabel = label;
+    #                 m = cpt[label];                    
+    #     return {self.fg.node[node_id].name():mlabel}
 
     def addEvidence(self,evidence):
         for name,label in evidence.items():
@@ -1098,9 +1132,20 @@ class LBPMaxSumInference:
         res = dict();
         for node_id in self.fg.nodes():
             if self.fg.node_type[node_id] == "variable":
-                re = self.posterior(node_id);
-                for key,value in re.items():
-                    res[key] = value;
+                cpt = self.posterior(node_id);
+                
+                m = None
+                mlabel = None
+                for label in range(len(self.fg.node[node_id].labels())):
+                    if mlabel == None:
+                        mlabel = label;
+                        m = cpt[label];
+                    else:
+                        if cpt[label] > m:
+                            mlabel = label;
+                            m = cpt[label];                 
+                name = self.fg.node[node_id].name()
+                res[name] = mlabel;
         return res;
     def posterior(self,node_id):
         assert self.fg.node_type[node_id] == "variable"
@@ -1110,23 +1155,11 @@ class LBPMaxSumInference:
             if cpt == None:
                 cpt = cpt2;
             else:
-                cpt = cpt * cpt2;
+                cpt = cpt + cpt2;
         # calculer la probabilite marginale
         cpt = cpt.margSumIn(self.fg.node[node_id].name())
-        # for name in cpt.var_names:
-        #     if self.fg.node[node_id].name() != name:
-        #         cpt = cpt.margSumOut(name);
-        m = None
-        mlabel = None
-        for label in range(len(self.fg.node[node_id].labels())):
-            if mlabel == None:
-                mlabel = label;
-                m = cpt[label];
-            else:
-                if cpt[label] > m:
-                    mlabel = label;
-                    m = cpt[label];                    
-        return {self.fg.node[node_id].name():mlabel}
+        
+        return cpt
 
     def addEvidence(self,evidence):
         for name,label in evidence.items():
