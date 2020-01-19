@@ -1,6 +1,6 @@
 import pyAgrum as gum
 debug = False
-
+    
 class FactorGraph(gum.UndiGraph):
 
     def __init__(self):
@@ -144,9 +144,11 @@ class TreeSumProductInference:
                     message = message * self.dict_dict_cpt[node_id][node_id3];
             if not(flag):
                 continue;
-            for name in message.var_names:
-                if name != self.fg.node[node_id2].name():
-                    message = message.margSumOut(name);
+                
+            message = message.margSumIn(self.fg.node[node_id2].name())
+            # for name in message.var_names:
+            #     if name != self.fg.node[node_id2].name():
+            #         message = message.margSumOut(name);
             # envoie de message
             self.dict_dict_cpt[node_id2][node_id] = message;
     
@@ -215,9 +217,10 @@ class TreeSumProductInference:
             else:
                 cpt = cpt * cpt2;
         # calculer la probabilite marginale
-        for name in cpt.var_names:
-            if self.fg.node[node_id].name() != name:
-                cpt = cpt.margSumOut(name);
+        cpt = cpt.margSumIn(self.fg.node[node_id].name())
+        # for name in cpt.var_names:
+        #     if self.fg.node[node_id].name() != name:
+        #         cpt = cpt.margSumOut(name);
         
         return cpt.normalize();
     
@@ -289,10 +292,10 @@ class LBPSumProductInference:
                 if self.dict_dict_cpt[node_id][node_id3] == 1:
                     continue;
                 message = message * self.dict_dict_cpt[node_id][node_id3];
-
-            for name in message.var_names:
-                if name != self.fg.node[node_id2].name():
-                    message = message.margSumOut(name);
+            message = message.margSumIn(self.fg.node[node_id2].name())
+            # for name in message.var_names:
+            #     if name != self.fg.node[node_id2].name():
+            #         message = message.margSumOut(name);
             # envoie de message
             if self.dict_dict_cpt[node_id2][node_id] != message:
                 flag = True;
@@ -331,9 +334,11 @@ class LBPSumProductInference:
             else:
                 cpt = cpt * cpt2;
         # calculer la probabilite marginale
-        for name in cpt.var_names:
-            if self.fg.node[node_id].name() != name:
-                cpt = cpt.margSumOut(name);
+                
+        cpt = cpt.margSumIn(self.fg.node[node_id].name())
+        # for name in cpt.var_names:
+        #     if self.fg.node[node_id].name() != name:
+        #         cpt = cpt.margSumOut(name);
         
         return cpt.normalize();
     
@@ -445,13 +450,15 @@ class TreeMaxProductInference:
             if not(flag):
                 continue;
 
-            ############################### max ######################  
-            for name in message.var_names:
-                if name != self.fg.node[node_id2].name():
-                    message = message.margSumOut(name);
-
-            argmax = message.argmax();
-            maxvalue = message.max();
+            ############################### max ###################### 
+            variable = self.fg.node[node_id2];
+            cpt = gum.Potential();
+            cpt.add(variable);
+            potential_list = [message[{variable.name():label}].max() for label in variable.labels()];            
+            cpt.fillWith(potential_list);
+            
+            # argmax = message.argmax();
+            # maxvalue = message.max();
 
             ###########################################################
             # envoie de message
@@ -531,9 +538,10 @@ class TreeMaxProductInference:
             else:
                 cpt = cpt * cpt2;
         # calculer la probabilite marginale
-        for name in cpt.var_names:
-            if self.fg.node[node_id].name() != name:
-                cpt = cpt.margSumOut(name);
+        cpt = cpt.margSumIn(self.fg.node[node_id].name())
+        # for name in cpt.var_names:
+        #     if self.fg.node[node_id].name() != name:
+        #         cpt = cpt.margSumOut(name);
         
         return cpt.argmax()[0]
 
@@ -591,20 +599,9 @@ class LBPMaxProductInference:
                         print("node {} envoie un message de type **{}** au node_factor {}".format(node_id,type(message),node_id2))
                 else:
                     #####################  calcul message ################################
+                    
                     message = message * self.dict_dict_cpt[node_id][node_id3];
-                    # m = self.dict_dict_cpt[node_id][node_id3]
-
-                    # cpt1 = gum.Potential()
-                    # cpt1.add(self.fg.node[node_id]);
-                    # name_id = self.fg.node[node_id].name();
-
-                    # cpt1(name_id)[0] = message[0]*m[0];
-                    # cpt1(name_id)[1] = message[1]*m[1];
-
-                    # message = cpt1;
-
-                    # if debug:
-                    #     print("node {} envoie un message de type **{}** au node_factor {}".format(name_id,type(message),node_id2))
+                    
                     ######################################################################
             if not(flag):
                 continue;
@@ -642,13 +639,15 @@ class LBPMaxProductInference:
             if not(flag):
                 continue;
 
-            ############################### max ######################  
-            for name in message.var_names:
-                if name != self.fg.node[node_id2].name():
-                    message = message.margSumOut(name);
-
-            argmax = message.argmax();
-            maxvalue = message.max();
+            ############################### max ###################### 
+            variable = self.fg.node[node_id2];
+            cpt = gum.Potential();
+            cpt.add(variable);
+            potential_list = [message[{variable.name():label}].max() for label in variable.labels()];            
+            cpt.fillWith(potential_list);
+            
+            # argmax = message.argmax();
+            # maxvalue = message.max();
 
             ###########################################################
             # envoie de message
@@ -728,9 +727,10 @@ class LBPMaxProductInference:
             else:
                 cpt = cpt * cpt2;
         # calculer la probabilite marginale
-        for name in cpt.var_names:
-            if self.fg.node[node_id].name() != name:
-                cpt = cpt.margSumOut(name);
+        cpt = cpt.margSumIn(self.fg.node[node_id].name())
+        # for name in cpt.var_names:
+        #     if self.fg.node[node_id].name() != name:
+        #         cpt = cpt.margSumOut(name);
         
         return cpt.argmax()[0]
 
@@ -751,6 +751,7 @@ class LBPMaxProductInference:
                 self.fg.addEdge(node_id ,node_id_factor)
                 
                 break;
+
 
 
         
